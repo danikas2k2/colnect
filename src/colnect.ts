@@ -15,11 +15,12 @@
 // ==/UserScript==
 
 
+// @ts-ignore
 import style from '../styles/colnect.less';
 document.head.insertAdjacentHTML("beforeend", `<style type="text/css">${style}</style>`);
 
 
-declare var Inventory: {
+declare const Inventory: {
     updateQC: (e: Event, n: HTMLElement) => {},
     spanCBup: (n: HTMLElement) => {},
 };

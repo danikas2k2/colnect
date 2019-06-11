@@ -8,7 +8,6 @@ const config: webpack.Configuration = {
     context: __dirname,
     entry: {
         'colnect': './src/colnect.ts',
-        'ucoin': './src/ucoin.ts',
     },
     module: {
         rules: [
