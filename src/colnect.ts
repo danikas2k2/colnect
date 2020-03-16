@@ -14,17 +14,17 @@
 // @run-at       document-end
 // ==/UserScript==
 
+declare const $: JQueryStatic;
 
 // @ts-ignore
 import style from '../styles/colnect.less';
-document.head.insertAdjacentHTML("beforeend", `<style type="text/css">${style}</style>`);
 
+$('head').append(`<style type="text/css">${style}</style>`);
 
 declare const Inventory: {
-    updateQC: (e: Event, n: HTMLElement) => {},
-    spanCBup: (n: HTMLElement) => {},
+    updateQC: (e: JQuery.ClickEvent, n: HTMLElement) => {};
+    spanCBup: (n: HTMLElement) => {};
 };
-
 
 const loc = document.location.href;
 
@@ -47,90 +47,94 @@ const type = (loc => {
     return 'other';
 })(loc);
 
-document.body.classList.add(type);
+$('body').addClass(type);
 
 
-const itemFullDetails = document.getElementById('item_full_details');
-const itemCondition = itemFullDetails.querySelector('>.ibox >.ibox_list[data-lt="2"] .pop.condition');
+const itemFullDetails = $('#item_full_details');
+const itemCondition = $(`> .ibox > .ibox_list[data-lt="2"] .pop.condition`, itemFullDetails);
 
-const _updateQC = Inventory.updateQC;
-const _spanCBup = Inventory.spanCBup;
+const {updateQC: _updateQC, spanCBup: _spanCBup} = Inventory;
 
 if (type === 'coins' && loc.includes('/coin/')) {
+    const itemYearVariants = $(`> .year_variants > ul > li[data-id]`, itemFullDetails);
 
-    const itemYearVariants = itemFullDetails.querySelectorAll('>.year_variants >ul >li[data-id]');
+    let currentPopCondition: JQuery;
+
+    const mouseOverCondition = (li: JQuery) => {
+        const popCondition = $('.ibox_list[data-lt="2"] > .pop.condition', li);
+        if (popCondition) {
+            popCondition.trigger('mouseover');
+        }
+        return popCondition;
+    };
 
     // clicking on year row
-    for (const itemYearVariant of itemYearVariants) {
-        itemYearVariant.addEventListener("click", e => {
-            const li = <HTMLLIElement> e.currentTarget;
-            li.querySelector('.ibox_list[data-lt="2"] >.pop.condition')
-                .dispatchEvent(new MouseEvent('mouseover'));
+    itemYearVariants.each((i, itemYearVariant) => {
+        $(itemYearVariant).on('click', e => {
+            currentPopCondition = mouseOverCondition($(e.currentTarget));
         });
-    }
+    });
 
 
-    const _q: {[key: string]: number} = {P: 1, FA: 2, G: 3, VG: 4, FI: 5, VF: 6, XF: 7, UNC: 8, BU: 9, FDC: 10};
+    const _q: { [key: string]: number } = {P: 1, FA: 2, G: 3, VG: 4, FI: 5, VF: 6, XF: 7, UNC: 8, BU: 9, FDC: 10};
 
-    function q(s: string) {
-        return (s && s in _q) ? _q[s] : 0;
-    }
+    const q = (s: string) => (s && s in _q) ? _q[s] : 0;
 
 
     //
 
+    const qualityList = $('#quality_list');
 
-    function updateOverallCondition(e: Event, current: number, container: HTMLElement) {
+    const updateOverallCondition = (e: JQuery.ClickEvent, current: number) => {
         const variants: number[] = [];
-        for (const n of itemYearVariants) {
+
+        itemYearVariants.each((i, n) => {
+            const qn = $('ul.oth_inv', n).text().split(':', 2).pop().trim();
             variants.push(n.classList.contains('open')
                 ? current
-                : q(n.querySelector('ul.oth_inv').textContent.split(':', 2).pop().trim()));
-        }
+                : q(qn));
+        });
 
         const best = Math.max(...variants);
-        if (best && best !== q(itemCondition.textContent)) {
-            itemCondition.dispatchEvent(new MouseEvent('mouseover'));
-            _updateQC(e, itemCondition.querySelector(`#quality_list a[data-value="${best}"]`));
-
-            if (container) {
-                container.dispatchEvent(new MouseEvent('mouseover'));
+        if (best && best !== q(itemCondition.text())) {
+            itemCondition.trigger('mouseover');
+            _updateQC(e, $(`#quality_list a[data-value="${best}"]`, itemCondition)[0]);
+            if (currentPopCondition && currentPopCondition.length) {
+                currentPopCondition.trigger('mouseover');
             } else {
-                itemCondition.dispatchEvent(new MouseEvent('mouseout'));
+                itemCondition.trigger('mouseout');
             }
         }
-    }
+    };
 
-    Inventory.updateQC = (e: Event, n: HTMLElement) => {
+    Inventory.updateQC = (e: JQuery.ClickEvent, n: HTMLElement) => {
         const _r = _updateQC(e, n);
-
-        updateOverallCondition(e, +n.dataset.value, n.querySelector('.pop.condition'));
-
+        updateOverallCondition(e, +$('a[data-value]', n).data('value'));
         return _r;
     };
 
     Inventory.spanCBup = (n: HTMLElement) => {
         const _r = _spanCBup(n);
-
         if (n.classList.contains('cb_checked')) {
+            // @ts-ignore
             updateOverallCondition(event, 0, null);
         } else {
-            itemCondition.dispatchEvent(new MouseEvent('mouseover'));
+            itemCondition.trigger('mouseover');
         }
-
         return _r;
     };
 
+    $('li', qualityList)
+        .off('click')
+        .on('click', e => Inventory.updateQC(e, e.currentTarget));
 } else {
-
     Inventory.spanCBup = (n: HTMLElement) => {
         const _r = _spanCBup(n);
 
         if (!n.classList.contains('cb_checked')) {
-            itemCondition.dispatchEvent(new MouseEvent('mouseover'));
+            itemCondition.trigger('mouseover');
         }
 
         return _r;
     };
-
 }
